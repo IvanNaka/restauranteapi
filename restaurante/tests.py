@@ -39,8 +39,10 @@ class MesaCadastroTest(TestCase):
             'capacidade': 2
         })
         self.assertEqual(response.status_code, 400)
+        
+        # Verifique se a mensagem de erro está contida na resposta JSON
         erro = json.loads(response.content).get('erro')
-        self.assertContains(erro, "O número já está em uso")
+        self.assertEqual(erro, "O número já está em uso")
 
 class MesaListarTest(TestCase):
     def setUp(self):
@@ -62,6 +64,17 @@ class ClienteCadastroTest(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertTrue(models.Cliente.objects.filter(nome='João').exists())
+
+    def test_cadastrar_cliente_email_repetido(self):
+        models.Cliente.objects.create(nome='João', telefone='123456789', email='joao@example.com')
+        response = self.client.post(reverse('cadastrar_cliente'), {
+            'nome': 'Maria',
+            'telefone': '987654321',
+            'email': 'joao@example.com'
+        })
+        
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("O e-mail já está em uso", response.json().get('erro'))
 
 class PedidoCriacaoTest(TestCase):
     def setUp(self):

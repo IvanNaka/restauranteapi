@@ -21,8 +21,17 @@ class CadastrarItem(APIView):
 
 class CadastrarMesa(APIView):
     def post(self, request):
-        #adicionar logica pra salvar mesa (algo similar ao de cima)
-        return JsonResponse()
+        numero_mesa = request.POST.get('numero')
+        capacidade_mesa = request.POST.get('capacidade')
+
+        if not numero_mesa or not capacidade_mesa:
+            return JsonResponse({'erro': 'Todos os campos devem ser preenchidos'}, status=400)
+
+        if Mesa.objects.filter(numero=numero_mesa).exists():
+            return JsonResponse({'erro': 'O número já está em uso'}, status=400)
+
+        Mesa.objects.create(numero=numero_mesa, capacidade=capacidade_mesa)
+        return JsonResponse({'status': 'Mesa cadastrada com sucesso'}, status=200)
 
 class ListarMesa(APIView):
     def get(self, request):
@@ -31,8 +40,19 @@ class ListarMesa(APIView):
 
 class CadastrarCliente(APIView):
     def post(self, request):
-        # adicionar logica pra salvar cliente (algo similar ao de item)
-        return JsonResponse()
+        nome_cliente = self.request.POST.get('nome')
+        telefone_cliente = self.request.POST.get('telefone')
+        email_cliente = self.request.POST.get('email')
+
+        if not nome_cliente or not telefone_cliente or not email_cliente:
+            return JsonResponse({'erro': 'Todos os campos devem ser preenchidos'}, status=400)
+        
+        if Cliente.objects.filter(email=email_cliente).exists():
+            return JsonResponse({'erro': 'O e-mail já está em uso'}, status=400)
+
+        Cliente.objects.create(nome=nome_cliente, telefone=telefone_cliente, email=email_cliente)
+        
+        return JsonResponse(data={'status': True}, status=200)
 
 class CriarPedido(APIView):
     def post(self, request):
