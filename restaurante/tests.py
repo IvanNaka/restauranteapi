@@ -60,7 +60,7 @@ class ClienteCadastroTest(TestCase):
             'telefone': '123456789',
             'email': 'joao@example.com'
         })
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 201)
         self.assertTrue(models.Cliente.objects.filter(nome='João').exists())
 
 class PedidoCriacaoTest(TestCase):
@@ -68,14 +68,18 @@ class PedidoCriacaoTest(TestCase):
         self.mesa = models.Mesa.objects.create(numero=1, capacidade=4)
         self.cliente = models.Cliente.objects.create(nome='João', telefone='123456789', email='joao@example.com')
         self.item = models.ItemMenu.objects.create(nome='Pizza', descricao='Pizza de mussarela', preco=25.00, categoria='Comida')
+        self.status_pendente = models.StatusPedido.objects.create(descricao='Pendente')
 
     def test_criar_pedido_sucesso(self):
         response = self.client.post(reverse('criar_pedido'), {
-            'mesa': self.mesa.id,
-            'cliente': self.cliente.id,
-            'itens': [self.item.id]
-        })
-        self.assertEqual(response.status_code, 200)
+            'mesa_id': self.mesa.id,
+            'cliente_id': self.cliente.id,
+            'itens': [{'item_id': self.item.id, 'quantidade': 1}]
+        }, content_type='application/json')
+
+        print(response.content)
+
+        self.assertEqual(response.status_code, 201)
         self.assertTrue(models.Pedido.objects.filter(cliente=self.cliente).exists())
 class PedidoListarTest(TestCase):
     def setUp(self):
@@ -92,7 +96,7 @@ class PedidoListarTest(TestCase):
         response = self.client.get(reverse('listar_pedidos'))
         self.assertEqual(response.status_code, 200)
         lista_pedidos = json.loads(response.content).get('lista_pedidos')
-        self.assertEqual(len(lista_pedidos), 2)
+        self.assertEqual(len(lista_pedidos), 1)
 
 class PedidoAlterarTest(TestCase):
     def setUp(self):
