@@ -55,12 +55,22 @@ class AlterarPedido(APIView):
         return JsonResponse()
 
 class AtualizarStatusPedido(APIView):
-    def post(self, request):
-        # adicionar logica pra atualizar status pedido
-        # 1 pegar no banco o valor com o id q vai vir do request
-        # fazer alteracao do valor
-        # salvar no banco
-        return JsonResponse()
+    def post(self, request, pedido_id):
+        novo_status = request.POST.get('status')
+
+        pedido = Pedido.objects.filter(id=pedido_id).first()
+        if not pedido:
+            return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
+
+        try:
+            status = StatusPedido.objects.get(descricao=novo_status)
+            pedido.status = status
+            pedido.save()
+            return JsonResponse({'status': status.descricao}, status=200)
+        except StatusPedido.DoesNotExist:
+            return JsonResponse({'erro': 'Seu pedido não tem status, por favor entre em contato com a loja'}, status=404)
+        except Pedido.DoesNotExist:
+            return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
 
 class CancelarPedido(APIView):
     def post(self, request):
@@ -77,10 +87,15 @@ class FecharPedido(APIView):
         # fazer alteracao do valor
         # salvar no banco
         return JsonResponse()
+        
 class CalcularValorPedido(APIView):
-    def get(self, request):
-        #pegar o valor dos itens do pedido e somar
-        return JsonResponse()
+    def get(self, request, pedido_id):
+        pedido = Pedido.objects.filter(id=pedido_id).first()
+        if not pedido:
+            return JsonResponse({'erro': 'Pedido não existe'}, status=404)
+
+        total = sum(item.preco for item in pedido.pedidoitem_set.all())
+        return JsonResponse({'valor_total': total}, status=200)
 
 class DividirValorPedido(APIView):
     def post(self, request):
