@@ -1,3 +1,4 @@
+import decimal
 import json
 
 from django.test import TestCase
@@ -40,7 +41,7 @@ class MesaCadastroTest(TestCase):
         })
         self.assertEqual(response.status_code, 400)
         erro = json.loads(response.content).get('erro')
-        self.assertContains(erro, "O número já está em uso")
+        self.assertEqual(erro, "O número já está em uso")
 
 class MesaListarTest(TestCase):
     def setUp(self):
@@ -72,7 +73,8 @@ class ClienteCadastroTest(TestCase):
         })
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("O e-mail já está em uso", response.json().get('erro'))
+        erro = json.loads(response.content).get('erro')
+        self.assertEqual("O e-mail já está em uso", erro)
 class PedidoCriacaoTest(TestCase):
     def setUp(self):
         self.mesa = models.Mesa.objects.create(numero=1, capacidade=4)
@@ -86,9 +88,6 @@ class PedidoCriacaoTest(TestCase):
             'cliente_id': self.cliente.id,
             'itens': [{'item_id': self.item.id, 'quantidade': 1}]
         }, content_type='application/json')
-
-        print(response.content)
-
         self.assertEqual(response.status_code, 201)
         self.assertTrue(models.Pedido.objects.filter(cliente=self.cliente).exists())
 class PedidoListarTest(TestCase):
@@ -131,7 +130,7 @@ class PedidoAtualizarStatusTest(TestCase):
         self.pedido = models.Pedido.objects.create(cliente=self.cliente, mesa=self.mesa, status=self.status)
     def test_atualizar_status_pedido(self):
         response = self.client.post(reverse('atualizar_status', args=[self.pedido.id]), {
-            'status': 'Em preparo'
+            'status': 'Finalizado'
         })
         self.assertEqual(response.status_code, 200)
         status = json.loads(response.content).get('status')
@@ -145,7 +144,7 @@ class PedidoCancelarTest(TestCase):
         self.status2 = models.StatusPedido.objects.create(descricao='Cancelado')
         self.pedido = models.Pedido.objects.create(cliente=self.cliente, mesa=self.mesa, status=self.status)
     def test_cancelar_pedido(self):
-        response = self.client.post(reverse('atualizar_status', args=[self.pedido.id]), {
+        response = self.client.post(reverse('cancelar_pedido', args=[self.pedido.id]), {
             'status': 'Em preparo'
         })
         self.assertEqual(response.status_code, 200)
@@ -160,7 +159,7 @@ class PedidoFecharTest(TestCase):
         self.status2 = models.StatusPedido.objects.create(descricao='Fechado')
         self.pedido = models.Pedido.objects.create(cliente=self.cliente, mesa=self.mesa, status=self.status)
     def test_fechar_pedido(self):
-        response = self.client.post(reverse('atualizar_status', args=[self.pedido.id]), {
+        response = self.client.post(reverse('fechar_pedido', args=[self.pedido.id]), {
             'status': 'Entregue'
         })
         self.assertEqual(response.status_code, 200)
@@ -175,14 +174,14 @@ class PedidoCalculoValorTotalTest(TestCase):
         self.pedido = models.Pedido.objects.create(cliente=self.cliente, mesa=self.mesa, status=self.status, )
         self.item1 = models.ItemMenu.objects.create(nome='Pizza', descricao='Pizza de mussarela', preco=25.00, categoria='Comida')
         self.item2 = models.ItemMenu.objects.create(nome='Coca-Cola', descricao='Lata de Coca-Cola', preco=5.00, categoria='Bebida')
-        self.pedido_item1 = models.PedidoItem.objects.create(item_menu=self.item1, preco=25.00, categoria='Comida', pedido=self.pedido)
-        self.pedido_item2 = models.PedidoItem.objects.create(item_menu=self.item2, preco=5.00, categoria='Bebida', pedido=self.pedido)
+        self.pedido_item1 = models.PedidoItem.objects.create(item_menu=self.item1, preco_unitario=25.00, pedido=self.pedido, quantidade=2)
+        self.pedido_item2 = models.PedidoItem.objects.create(item_menu=self.item2, preco_unitario=5.00, pedido=self.pedido, quantidade=2)
 
     def test_calcular_valor_total_pedido(self):
         response = self.client.get(reverse('calcular_valor_total', args=[self.pedido.id]))
         self.assertEqual(response.status_code, 200)
-        valor_total = json.loads(response.content).get('valor_total')
-        self.assertEqual(valor_total, 30.00)
+        valor_total = decimal.Decimal(json.loads(response.content).get('valor_total'))
+        self.assertEqual(valor_total, 60.00)
 
 class PedidoDividirValorTest(TestCase):
     def setUp(self):
@@ -192,12 +191,12 @@ class PedidoDividirValorTest(TestCase):
         self.pedido = models.Pedido.objects.create(cliente=self.cliente, mesa=self.mesa, status=self.status, )
         self.item1 = models.ItemMenu.objects.create(nome='Pizza', descricao='Pizza de mussarela', preco=25.00, categoria='Comida')
         self.item2 = models.ItemMenu.objects.create(nome='Coca-Cola', descricao='Lata de Coca-Cola', preco=5.00, categoria='Bebida')
-        self.pedido_item1 = models.PedidoItem.objects.create(item_menu=self.item1, preco=35.00, categoria='Comida', pedido=self.pedido)
-        self.pedido_item2 = models.PedidoItem.objects.create(item_menu=self.item2, preco=5.00, categoria='Bebida', pedido=self.pedido)
+        self.pedido_item1 = models.PedidoItem.objects.create(item_menu=self.item1, preco_unitario=35.00, pedido=self.pedido, quantidade=2)
+        self.pedido_item2 = models.PedidoItem.objects.create(item_menu=self.item2, preco_unitario=5.00, pedido=self.pedido, quantidade=2)
     def test_dividir_valor_pedido(self):
         response = self.client.post(reverse('dividir_valor', args=[self.pedido.id]), {
             'numero_pessoas': 4
         })
         self.assertEqual(response.status_code, 200)
-        valor_pessoa = json.loads(response.content).get('valor_por_pessoa')
-        self.assertEqual(valor_pessoa, 10.00)
+        valor_pessoa = decimal.Decimal(json.loads(response.content).get('valor_por_pessoa'))
+        self.assertEqual(valor_pessoa, 20.00)

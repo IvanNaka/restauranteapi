@@ -40,6 +40,8 @@ class CadastrarCliente(APIView):
         # Validação das informações obrigatórias
         if not nome or not telefone or not email:
             return JsonResponse({'erro': 'Todos os campos devem ser preenchidos'}, status=400)
+        if Cliente.objects.filter(email=email).exists():
+            return JsonResponse({'erro': 'O e-mail já está em uso'}, status=400)
 
         try:
             cliente = Cliente.objects.create(nome=nome, telefone=telefone, email=email)
@@ -158,28 +160,41 @@ class AtualizarStatusPedido(APIView):
             return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
 
 class CancelarPedido(APIView):
-    def post(self, request):
-        # adicionar logica pra cancelar pedido
-        # 1 pegar no banco o valor com o id q vai vir do request
-        # fazer alteracao do valor
-        # salvar no banco
-        return JsonResponse()
+    def post(self, request, pedido_id):
+        status_cancelado = StatusPedido.objects.get(descricao='Cancelado')
+        pedido = Pedido.objects.filter(id=pedido_id).first()
+        if not pedido:
+            return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
+        try:
+            pedido.status = status_cancelado
+            pedido.save()
+            return JsonResponse({'status': status_cancelado.descricao}, status=200)
+        except StatusPedido.DoesNotExist:
+            return JsonResponse({'erro': 'Seu pedido não tem status, por favor entre em contato com a loja'}, status=404)
+        except Pedido.DoesNotExist:
+            return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
 
 class FecharPedido(APIView):
-    def post(self, request):
-        # adicionar logica pra fechar pedido
-        # 1 pegar no banco o valor com o id q vai vir do request
-        # fazer alteracao do valor
-        # salvar no banco
-        return JsonResponse()
+    def post(self, request, pedido_id):
+        status_fechado = StatusPedido.objects.get(descricao='Fechado')
+        pedido = Pedido.objects.filter(id=pedido_id).first()
+        if not pedido:
+            return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
+        try:
+            pedido.status = status_fechado
+            pedido.save()
+            return JsonResponse({'status': status_fechado.descricao}, status=200)
+        except StatusPedido.DoesNotExist:
+            return JsonResponse({'erro': 'Seu pedido não tem status, por favor entre em contato com a loja'}, status=404)
+        except Pedido.DoesNotExist:
+            return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
 
 class CalcularValorPedido(APIView):
     def get(self, request, pedido_id):
         pedido = Pedido.objects.filter(id=pedido_id).first()
         if not pedido:
             return JsonResponse({'erro': 'Pedido não existe'}, status=404)
-
-        total = sum(item.preco for item in pedido.pedidoitem_set.all())
+        total = sum(item.preco_unitario * item.quantidade for item in pedido.pedidoitem_set.all())
         return JsonResponse({'valor_total': total}, status=200)
 
 class DividirValorPedido(APIView):
