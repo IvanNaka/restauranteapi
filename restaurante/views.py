@@ -34,17 +34,86 @@ class CadastrarCliente(APIView):
         # adicionar logica pra salvar cliente (algo similar ao de item)
         return JsonResponse()
 
+from django.http import JsonResponse
+from rest_framework.views import APIView
+from restaurante.models import Cliente, Mesa, StatusPedido, Pedido, ItemMenu, PedidoItem
+
+class CadastrarCliente(APIView):
+    def post(self, request):
+        nome = request.data.get('nome')
+        telefone = request.data.get('telefone')
+        email = request.data.get('email')
+
+        # Validação das informações obrigatórias
+        if not nome or not telefone or not email:
+            return JsonResponse({'erro': 'Todos os campos devem ser preenchidos'}, status=400)
+
+        try:
+            cliente = Cliente.objects.create(nome=nome, telefone=telefone, email=email)
+            return JsonResponse({
+                'status': True,
+                'mensagem': 'Cliente cadastrado com sucesso',
+                'cliente_id': cliente.id
+            }, status=201)
+
+        except Exception as e:
+            return JsonResponse({'erro': f'Erro ao cadastrar cliente: {str(e)}'}, status=500)
+
 class CriarPedido(APIView):
     def post(self, request):
-        # adicionar logica pra salvar pedido (algo similar ao de item)
-        return JsonResponse()
+        cliente_id = request.data.get('cliente_id')
+        mesa_id = request.data.get('mesa_id')
+        itens = request.data.get('itens', [])
+
+        if not cliente_id or not mesa_id or not itens:
+            return JsonResponse({'erro': 'Cliente, mesa e itens são obrigatórios'}, status=400)
+
+        try:
+            cliente = Cliente.objects.get(id=cliente_id)
+            mesa = Mesa.objects.get(id=mesa_id)
+            status_pendente = StatusPedido.objects.get(descricao='Pendente')
+
+            pedido = Pedido.objects.create(
+                cliente=cliente,
+                mesa=mesa,
+                status=status_pendente
+            )
+
+            for item in itens:
+                item_menu = ItemMenu.objects.get(id=item['item_id'])
+                PedidoItem.objects.create(
+                    pedido=pedido,
+                    item_menu=item_menu,
+                    quantidade=item['quantidade'],
+                    preco_unitario=item_menu.preco
+                )
+
+            return JsonResponse({
+                'status': True,
+                'mensagem': 'Pedido criado com sucesso',
+                'pedido_id': pedido.id
+            }, status=201)
+
+        except Cliente.DoesNotExist:
+            return JsonResponse({'erro': 'Cliente não encontrado'}, status=404)
+        except Mesa.DoesNotExist:
+            return JsonResponse({'erro': 'Mesa não encontrada'}, status=404)
+        except ItemMenu.DoesNotExist:
+            return JsonResponse({'erro': 'Item do menu não encontrado'}, status=404)
+        except Exception as e:
+            return JsonResponse({'erro': f'Erro ao criar pedido: {str(e)}'}, status=500)
 
 class ListarPedido(APIView):
     def get(self, request):
-        # listar pedidos exceto status cancelado (algo similar ao de listar mesas)
-        # mas adicionar a propriedade exclude
-        # exemplo: Pedido.objects.exclude(status__descricao='Cancelado')
-        return JsonResponse()
+        # Listar pedidos, excluindo aqueles com status "Cancelado"
+        pedidos = Pedido.objects.exclude(status__descricao='Cancelado').values(
+            'id', 'cliente__nome', 'mesa__numero', 'status__descricao'
+        )
+
+        # Converter a QuerySet em uma lista
+        pedidos_lista = list(pedidos)
+
+        return JsonResponse({'lista_pedidos': pedidos_lista}, status=200)
 
 class AlterarPedido(APIView):
     class AlterarPedido(APIView):
