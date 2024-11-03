@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 
 from restaurante.models import ItemMenu, Cliente, Mesa, StatusPedido, Pedido, PedidoItem, Pagamento
@@ -47,20 +47,52 @@ class ListarPedido(APIView):
         return JsonResponse()
 
 class AlterarPedido(APIView):
-    def post(self, request):
-        # adicionar logica pra alterar pedido
-        # 1 pegar no banco o valor com o id q vai vir do request
-        # fazer alteracao do valor
-        # salvar no banco
-        return JsonResponse()
+    class AlterarPedido(APIView):
+        def post(self, request, pedido_id):
+            try:
+                # Obtém o pedido pelo ID
+                pedido = Pedido.objects.get(id=pedido_id)
+
+                # Limpa os itens atuais do pedido
+                PedidoItem.objects.filter(pedido=pedido).delete()
+
+                # Obtém a lista de IDs dos novos itens e suas quantidades enviadas no request
+                itens_data = request.data.get('itens', [])
+                for item_data in itens_data:
+                    item_id = item_data.get('id')
+                    quantidade = item_data.get('quantidade', 1)
+
+                    item = ItemMenu.objects.get(id=item_id)
+                    PedidoItem.objects.create(
+                        pedido=pedido,
+                        item_menu=item,
+                        quantidade=quantidade,
+                        preco_unitario=item.preco
+                    )
+
+                return JsonResponse({"message": "Itens do pedido atualizados com sucesso."}, status=200)
+            except Pedido.DoesNotExist:
+                return JsonResponse({"error": "Pedido não encontrado."}, status=404)
+            except ItemMenu.DoesNotExist:
+                return JsonResponse({"error": "Item de menu não encontrado."}, status=404)
+            except Exception as e:
+                return JsonResponse({"error": str(e)}, status=400)
 
 class AtualizarStatusPedido(APIView):
-    def post(self, request):
-        # adicionar logica pra atualizar status pedido
-        # 1 pegar no banco o valor com o id q vai vir do request
-        # fazer alteracao do valor
-        # salvar no banco
-        return JsonResponse()
+    def post(self, request, pedido_id):
+        novo_status = request.POST.get('status')
+        pedido = Pedido.objects.filter(id=pedido_id).first()
+
+        if not pedido:
+            return JsonResponse({'erro': 'Pedido não encontrado'}, status=404)
+
+        try:
+            status = StatusPedido.objects.get(descricao=novo_status)
+            pedido.status = status
+            pedido.save()
+            return JsonResponse({'status': status.descricao}, status=200)
+        except StatusPedido.DoesNotExist:
+            return JsonResponse({'erro': 'Seu pedido não tem status, por favor entre em contato com a loja'}, status=404)
 
 class CancelarPedido(APIView):
     def post(self, request):
@@ -78,11 +110,33 @@ class FecharPedido(APIView):
         # salvar no banco
         return JsonResponse()
 class CalcularValorPedido(APIView):
-    def get(self, request):
-        #pegar o valor dos itens do pedido e somar
-        return JsonResponse()
+    def get(self, request, pedido_id):
+        pedido = get_object_or_404(Pedido, id=pedido_id)
+
+        total = sum(item.preco for item in pedido.itens.all())
+
+        return JsonResponse({'valor_total': total}, status=200)
+
 
 class DividirValorPedido(APIView):
-    def post(self, request):
-        # pegar o valor dos itens do pedido e somar e divir pelo numero de pessoas
-        return JsonResponse()
+    def post(self, request, pedido_id):
+        try:
+            # Obtém o pedido pelo ID
+            pedido = Pedido.objects.get(id=pedido_id)
+
+            # Calcula o valor total do pedido somando (preço unitário * quantidade) de cada item do pedido
+            valor_total = sum(item.preco_unitario * item.quantidade for item in pedido.pedidoitem_set.all())
+
+            # Obtém o número de pessoas enviado no request
+            numero_pessoas = int(request.data.get('numero_pessoas', 1))
+            if numero_pessoas <= 0:
+                raise ValueError("O número de pessoas deve ser maior que zero.")
+
+            # Calcula o valor por pessoa
+            valor_por_pessoa = valor_total / numero_pessoas
+
+            return JsonResponse({"valor_por_pessoa": round(valor_por_pessoa, 2)}, status=200)
+        except Pedido.DoesNotExist:
+            return JsonResponse({"error": "Pedido não encontrado."}, status=404)
+        except (ValueError, ZeroDivisionError) as e:
+            return JsonResponse({"error": str(e)}, status=400)
