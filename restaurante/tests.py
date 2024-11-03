@@ -63,6 +63,16 @@ class ClienteCadastroTest(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertTrue(models.Cliente.objects.filter(nome='João').exists())
 
+    def test_cadastrar_cliente_email_repetido(self):
+        models.Cliente.objects.create(nome='João', telefone='123456789', email='joao@example.com')
+        response = self.client.post(reverse('cadastrar_cliente'), {
+            'nome': 'Maria',
+            'telefone': '987654321',
+            'email': 'joao@example.com'
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("O e-mail já está em uso", response.json().get('erro'))
 class PedidoCriacaoTest(TestCase):
     def setUp(self):
         self.mesa = models.Mesa.objects.create(numero=1, capacidade=4)

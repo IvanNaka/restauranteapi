@@ -1,12 +1,8 @@
-from django.contrib.auth.models import User
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
 from rest_framework.views import APIView
 
 from restaurante.models import ItemMenu, Cliente, Mesa, StatusPedido, Pedido, PedidoItem, Pagamento
 
-
-# Create your views here.
 class CadastrarItem(APIView):
     def post(self, request):
         nome_item = self.request.POST.get('nome')
@@ -21,8 +17,14 @@ class CadastrarItem(APIView):
 
 class CadastrarMesa(APIView):
     def post(self, request):
-        #adicionar logica pra salvar mesa (algo similar ao de cima)
-        return JsonResponse()
+        numero_mesa = request.POST.get('numero')
+        capacidade_mesa = request.POST.get('capacidade')
+        if not numero_mesa or not capacidade_mesa:
+            return JsonResponse({'erro': 'Todos os campos devem ser preenchidos'}, status=400)
+        if Mesa.objects.filter(numero=numero_mesa).exists():
+            return JsonResponse({'erro': 'O número já está em uso'}, status=400)
+        Mesa.objects.create(numero=numero_mesa, capacidade=capacidade_mesa)
+        return JsonResponse({'status': 'Mesa cadastrada com sucesso'}, status=200)
 
 class ListarMesa(APIView):
     def get(self, request):
@@ -96,12 +98,11 @@ class CriarPedido(APIView):
 
 class ListarPedido(APIView):
     def get(self, request):
-        # Listar pedidos, excluindo aqueles com status "Cancelado"
+
         pedidos = Pedido.objects.exclude(status__descricao='Cancelado').values(
             'id', 'cliente__nome', 'mesa__numero', 'status__descricao'
         )
 
-        # Converter a QuerySet em uma lista
         pedidos_lista = list(pedidos)
 
         return JsonResponse({'lista_pedidos': pedidos_lista}, status=200)
@@ -184,18 +185,11 @@ class CalcularValorPedido(APIView):
 class DividirValorPedido(APIView):
     def post(self, request, pedido_id):
         try:
-            # Obtém o pedido pelo ID
             pedido = Pedido.objects.get(id=pedido_id)
-
-            # Calcula o valor total do pedido somando (preço unitário * quantidade) de cada item do pedido
             valor_total = sum(item.preco_unitario * item.quantidade for item in pedido.pedidoitem_set.all())
-
-            # Obtém o número de pessoas enviado no request
             numero_pessoas = int(request.data.get('numero_pessoas', 1))
             if numero_pessoas <= 0:
                 raise ValueError("O número de pessoas deve ser maior que zero.")
-
-            # Calcula o valor por pessoa
             valor_por_pessoa = valor_total / numero_pessoas
 
             return JsonResponse({"valor_por_pessoa": round(valor_por_pessoa, 2)}, status=200)
