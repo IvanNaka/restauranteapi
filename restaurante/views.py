@@ -31,15 +31,6 @@ class ListarMesa(APIView):
 
 class CadastrarCliente(APIView):
     def post(self, request):
-        # adicionar logica pra salvar cliente (algo similar ao de item)
-        return JsonResponse()
-
-from django.http import JsonResponse
-from rest_framework.views import APIView
-from restaurante.models import Cliente, Mesa, StatusPedido, Pedido, ItemMenu, PedidoItem
-
-class CadastrarCliente(APIView):
-    def post(self, request):
         nome = request.data.get('nome')
         telefone = request.data.get('telefone')
         email = request.data.get('email')
