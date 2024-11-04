@@ -1,3 +1,5 @@
+import json
+
 from django.http import JsonResponse
 from rest_framework.views import APIView
 
@@ -110,36 +112,27 @@ class ListarPedido(APIView):
         return JsonResponse({'lista_pedidos': pedidos_lista}, status=200)
 
 class AlterarPedido(APIView):
-    class AlterarPedido(APIView):
-        def post(self, request, pedido_id):
-            try:
-                # Obtém o pedido pelo ID
-                pedido = Pedido.objects.get(id=pedido_id)
+    def post(self, request, pedido_id):
+        try:
+            pedido = Pedido.objects.get(id=pedido_id)
+            PedidoItem.objects.filter(pedido=pedido).delete()
+            itens_data = json.loads(self.request.data.get('itens'))
 
-                # Limpa os itens atuais do pedido
-                PedidoItem.objects.filter(pedido=pedido).delete()
-
-                # Obtém a lista de IDs dos novos itens e suas quantidades enviadas no request
-                itens_data = request.data.get('itens', [])
-                for item_data in itens_data:
-                    item_id = item_data.get('id')
-                    quantidade = item_data.get('quantidade', 1)
-
-                    item = ItemMenu.objects.get(id=item_id)
-                    PedidoItem.objects.create(
-                        pedido=pedido,
-                        item_menu=item,
-                        quantidade=quantidade,
-                        preco_unitario=item.preco
-                    )
-
-                return JsonResponse({"message": "Itens do pedido atualizados com sucesso."}, status=200)
-            except Pedido.DoesNotExist:
-                return JsonResponse({"error": "Pedido não encontrado."}, status=404)
-            except ItemMenu.DoesNotExist:
-                return JsonResponse({"error": "Item de menu não encontrado."}, status=404)
-            except Exception as e:
-                return JsonResponse({"error": str(e)}, status=400)
+            for item_data in itens_data:
+                item_id = item_data.get('id')
+                quantidade = item_data.get('quantidade')
+                itemMenu = ItemMenu.objects.get(id=item_id)
+                PedidoItem.objects.create(
+                    pedido=pedido,
+                    item_menu=itemMenu,
+                    quantidade=quantidade,
+                    preco_unitario=itemMenu.preco
+                )
+            return JsonResponse({"message": "Itens do pedido atualizados com sucesso."}, status=200)
+        except Pedido.DoesNotExist:
+            return JsonResponse({"error": "Pedido não encontrado."}, status=404)
+        except ItemMenu.DoesNotExist:
+            return JsonResponse({"error": "Item de menu não encontrado."}, status=404)
 
 class AtualizarStatusPedido(APIView):
     def post(self, request, pedido_id):
